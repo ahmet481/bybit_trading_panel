@@ -1,6 +1,6 @@
-import { eq } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users } from "../drizzle/schema";
+import { InsertUser, users, InsertSignal, signals, apiKeys, trades } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -89,4 +89,80 @@ export async function getUserByOpenId(openId: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
-// TODO: add feature queries here as your schema grows.
+/**
+ * API Key Management
+ */
+export async function getApiKeyByUserId(userId: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  
+  const result = await db
+    .select()
+    .from(apiKeys)
+    .where(eq(apiKeys.userId, userId))
+    .limit(1);
+  
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function saveApiKey(userId: number, key: string, secret: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const existing = await getApiKeyByUserId(userId);
+  
+  if (existing) {
+    await db
+      .update(apiKeys)
+      .set({ apiKey: key, apiSecret: secret, updatedAt: new Date() })
+      .where(eq(apiKeys.userId, userId));
+  } else {
+    await db.insert(apiKeys).values({ userId, apiKey: key, apiSecret: secret });
+  }
+}
+
+/**
+ * Signal Management
+ */
+export async function createSignal(signal: InsertSignal) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const result = await db.insert(signals).values(signal);
+  return result;
+}
+
+export async function getRecentSignals(userId: number, limit: number = 50) {
+  const db = await getDb();
+  if (!db) return [];
+  
+  return await db
+    .select()
+    .from(signals)
+    .where(eq(signals.userId, userId))
+    .orderBy((s) => desc(s.createdAt))
+    .limit(limit);
+}
+
+export async function getSignalStats(userId: number) {
+  const db = await getDb();
+  if (!db) return null;
+  
+  const userTrades = await db
+    .select()
+    .from(trades)
+    .where(eq(trades.userId, userId));
+  
+  if (userTrades.length === 0) return null;
+  
+  const totalTrades = userTrades.length;
+  const winningTrades = userTrades.filter((t) => parseFloat(t.pnl) > 0).length;
+  const totalPnL = userTrades.reduce((sum, t) => sum + parseFloat(t.pnl), 0);
+  
+  return {
+    totalTrades,
+    winningTrades,
+    winRate: ((winningTrades / totalTrades) * 100).toFixed(2),
+    totalPnL: totalPnL.toFixed(2),
+  };
+}
