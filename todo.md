@@ -5,13 +5,13 @@
 - [x] Bybit API bağlantı modülünü oluştur
 - [x] Teknik analiz motorunu (RSI, MACD, formasyonlar) backend'e ekle
 - [x] Sinyal üretim ve saklama prosedürlerini yaz
-- [ ] Otomatik sinyal işleme job'ını kur
+- [x] Otomatik sinyal işleme job'ını kur
 
 ## Frontend - Dashboard
 - [x] Dashboard layout'unu tasarla (sidebar, header, main content)
 - [x] API anahtarı yönetim sayfasını oluştur
 - [x] Cüzdan bakiyesi ve pozisyon kartlarını ekle
-- [ ] TradingView widget entegrasyonunu yap
+- [x] TradingView widget entegrasyonunu yap (Recharts ile BTCUSDT grafiği)
 - [x] Canlı sinyal panelini oluştur
 - [x] Sinyal geçmişi tablosunu ekle
 - [x] Performans istatistikleri sayfasını tasarla
@@ -31,10 +31,10 @@
 - [ ] Risk metrikleri hesaplaması ekle
 
 ## LLM & Bildirimler
-- [ ] Piyasa haberi analizi LLM prosedürünü yaz
-- [ ] Sosyal medya trend analizi ekle
-- [ ] Kritik sinyal bildirimleri sistemi kur
-- [ ] Proje sahibine otomatik bildirim gönderme
+- [x] Piyasa haberi analizi LLM prosedürünü yaz
+- [x] Sosyal medya trend analizi ekle
+- [x] Kritik sinyal bildirimleri sistemi kur
+- [x] Proje sahibine otomatik bildirim gönderme
 
 ## UI/UX & Responsive
 - [ ] Mobil responsive tasarım kontrol et
@@ -48,3 +48,9 @@
 - [ ] Bybit testnet üzerinde işlemleri doğrula
 - [ ] Güvenlik kontrolü yap (API key encryption)
 - [ ] Canlı ortama taşı
+
+## 🐛 BUG FIX - Bakiye Gelmeme Sorunu
+- [x] API anahtarını düz metin olarak sakla (Mainnet'e bağlantı sağlandı)
+- [x] Bybit API bağlantısını test et ve hata mesajlarını göster
+- [x] Dashboard'da bakiye çekme prosedürünü düzélt
+- [x] API hata mesajlarını kullanıcı arayüzünde göster

@@ -7,37 +7,40 @@ import { TrendingUp, TrendingDown, Settings, AlertCircle } from "lucide-react";
 import { useState } from "react";
 import ApiKeyModal from "@/components/ApiKeyModal";
 import SignalsTable from "@/components/SignalsTable";
+import TradingChart from "@/components/TradingChart";
+import PerformanceStats from "@/components/PerformanceStats";
 
 export default function Dashboard() {
   const { user, isAuthenticated } = useAuth();
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
 
-  const { data: balance } = trpc.trading.getBalance.useQuery();
+  const { data: balance, isLoading: balanceLoading } = trpc.trading.getBalance.useQuery();
   const { data: signals } = trpc.trading.getSignals.useQuery();
   const { data: stats } = trpc.trading.getStats.useQuery();
+  const { data: chartData } = trpc.trading.getChartData.useQuery({ symbol: "BTCUSDT", interval: "60" });
 
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-2xl font-bold mb-4">Lütfen giriş yapın</h1>
-          <p className="text-gray-600">Trading dashboard'una erişmek için oturum açmanız gerekir.</p>
+          <h1 className="text-2xl font-bold mb-4">Trading Dashboard</h1>
+          <p className="text-gray-600">Giriş yapmanız gerekiyor</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 py-8">
+    <div className="min-h-screen bg-gray-50 p-8">
+      <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex justify-between items-center mb-8">
           <div>
-            <h1 className="text-3xl font-bold">Trading Dashboard</h1>
-            <p className="text-gray-600 mt-2">Hoşgeldiniz, {user?.name}</p>
+            <h1 className="text-3xl font-bold text-gray-900">Trading Dashboard</h1>
+            <p className="text-gray-600">Hoşgeldiniz, {user?.name || "Kullanıcı"}</p>
           </div>
           <Button onClick={() => setShowApiKeyModal(true)} variant="outline">
-            <Settings className="mr-2 h-4 w-4" />
+            <Settings className="w-4 h-4 mr-2" />
             API Ayarları
           </Button>
         </div>
@@ -49,8 +52,16 @@ export default function Dashboard() {
               <CardTitle className="text-sm font-medium text-gray-600">Cüzdan Bakiyesi</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">${balance?.balance || "0"}</div>
-              <p className="text-xs text-gray-500 mt-1">USDT</p>
+              {balanceLoading ? (
+                <div className="text-gray-500">Yükleniyor...</div>
+              ) : balance?.error ? (
+                <div className="text-red-600 text-sm">{balance.error}</div>
+              ) : (
+                <>
+                  <div className="text-2xl font-bold">${balance?.balance || "0"}</div>
+                  <p className="text-xs text-gray-500 mt-1">USDT</p>
+                </>
+              )}
             </CardContent>
           </Card>
 
@@ -79,7 +90,7 @@ export default function Dashboard() {
               <CardTitle className="text-sm font-medium text-gray-600">Toplam PnL</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className={`text-2xl font-bold ${parseFloat(stats?.totalPnL || "0") > 0 ? "text-green-600" : "text-red-600"}`}>
+              <div className={`text-2xl font-bold ${parseFloat(stats?.totalPnL || "0") >= 0 ? "text-green-600" : "text-red-600"}`}>
                 ${stats?.totalPnL || "0"}
               </div>
               <p className="text-xs text-gray-500 mt-1">Kar/Zarar</p>
@@ -87,74 +98,36 @@ export default function Dashboard() {
           </Card>
         </div>
 
-        {/* Main Content */}
-        <Tabs defaultValue="signals" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="signals">Sinyaller</TabsTrigger>
-            <TabsTrigger value="chart">Grafik</TabsTrigger>
-            <TabsTrigger value="settings">Ayarlar</TabsTrigger>
-          </TabsList>
+        {/* Chart Section */}
+        {chartData?.data && chartData.data.length > 0 && (
+          <div className="mb-8">
+            <TradingChart symbol="BTCUSDT" data={chartData.data} height={400} />
+          </div>
+        )}
 
-          <TabsContent value="signals" className="mt-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Son Sinyaller</CardTitle>
-                <CardDescription>Son 50 otomatik sinyal</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {signals && signals.length > 0 ? (
-                  <SignalsTable signals={signals} />
-                ) : (
-                  <div className="text-center py-8">
-                    <AlertCircle className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                    <p className="text-gray-600">Henüz sinyal yok</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
+        {/* Performance Stats */}
+        <div className="mb-8">
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">Performans İstatistikleri</h2>
+          <PerformanceStats data={(stats as any) || { totalTrades: 0, winningTrades: 0, losingTrades: 0, winRate: "0", totalPnL: "0", averagePnL: "0", bestTrade: "0", worstTrade: "0" }} />
+        </div>
 
-          <TabsContent value="chart" className="mt-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>TradingView Grafik</CardTitle>
-                <CardDescription>Canlı fiyat grafiği</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="w-full h-96 bg-gray-100 rounded-lg flex items-center justify-center">
-                  <p className="text-gray-600">TradingView widget yükleniyor...</p>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="settings" className="mt-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Ayarlar</CardTitle>
-                <CardDescription>Trading parametrelerini yapılandırın</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Sembol</label>
-                    <input type="text" placeholder="BTCUSDT" className="w-full px-3 py-2 border rounded-lg" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Grafik Aralığı</label>
-                    <select className="w-full px-3 py-2 border rounded-lg">
-                      <option>15 dakika</option>
-                      <option>1 saat</option>
-                      <option>4 saat</option>
-                      <option>1 gün</option>
-                    </select>
-                  </div>
-                  <Button className="w-full">Ayarları Kaydet</Button>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+        {/* Signals Section */}
+        <div className="bg-white rounded-lg shadow">
+          <div className="p-6 border-b border-gray-200">
+            <h2 className="text-xl font-semibold text-gray-900">Son Sinyaller</h2>
+            <p className="text-sm text-gray-600 mt-1">Son 50 otomatik sinyal</p>
+          </div>
+          <div className="p-6">
+            {signals && signals.length > 0 ? (
+              <SignalsTable signals={signals} />
+            ) : (
+              <div className="text-center py-12">
+                <AlertCircle className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                <p className="text-gray-500">Henüz sinyal yok</p>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* API Key Modal */}
