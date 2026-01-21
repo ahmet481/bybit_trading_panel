@@ -54,43 +54,19 @@ export const appRouter = router({
       .input(z.object({ apiKey: z.string(), apiSecret: z.string() }))
       .mutation(async ({ ctx, input }) => {
         try {
-          console.log("[Trading] Saving API key for user:", ctx.user.id);
           await db.saveApiKey(ctx.user.id, input.apiKey, input.apiSecret);
-          return { success: true, message: "API anahtarları başarıyla kaydedildi" };
+          return { success: true };
         } catch (error: any) {
           console.error("[Trading] Save API key error:", error);
           return { success: false, error: String(error.message) };
         }
       }),
 
-    getSignals: protectedProcedure.query(async ({ ctx }) => {
-      try {
-        const signals = await db.getRecentSignals(ctx.user.id, 50);
-        return signals;
-      } catch (error: any) {
-        console.error("[Trading] Get signals error:", error);
-        return [];
-      }
-    }),
-
-    getStats: protectedProcedure.query(async ({ ctx }) => {
-      try {
-        const stats = await db.getSignalStats(ctx.user.id);
-        return stats || { totalTrades: 0, winningTrades: 0, winRate: "0", totalPnL: "0" };
-      } catch (error: any) {
-        console.error("[Trading] Get stats error:", error);
-        return { totalTrades: 0, winningTrades: 0, winRate: "0", totalPnL: "0" };
-      }
-    }),
-
     getChartData: protectedProcedure
       .input(z.object({ symbol: z.string(), interval: z.string().default("60") }))
-      .query(async ({ ctx, input }) => {
+      .query(async ({ input }) => {
         try {
-          const apiKey = await db.getApiKeyByUserId(ctx.user.id);
-          if (!apiKey) return { data: [], error: "API anahtarı yapılandırılmamış" };
-          
-          const bybit = new BybitManager(apiKey.apiKey, apiKey.apiSecret);
+          const bybit = new BybitManager("dummy", "dummy");
           const klineData = await bybit.getKlineData(input.symbol, input.interval, 100);
           
           return { data: klineData, error: null };
@@ -112,6 +88,54 @@ export const appRouter = router({
           return { sentiment: "neutral", score: 0, summary: "Analiz yapılamadı" };
         }
       }),
+
+    startBot: protectedProcedure
+      .input(z.object({
+        symbol: z.string().default("BTCUSDT"),
+        leverage: z.number().default(10),
+        riskPercent: z.number().default(5),
+        stopLossPercent: z.number().default(2),
+        takeProfitPercent: z.number().default(4),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        try {
+          const { startBot } = await import("./tradingBot");
+          const result = await startBot(
+            ctx.user.id,
+            input.symbol,
+            input.leverage,
+            input.riskPercent,
+            input.stopLossPercent,
+            input.takeProfitPercent
+          );
+          return result;
+        } catch (error: any) {
+          console.error("[Trading] Start bot error:", error);
+          return { success: false, error: error.message };
+        }
+      }),
+
+    stopBot: protectedProcedure.mutation(async ({ ctx }) => {
+      try {
+        const { stopBot } = await import("./tradingBot");
+        const result = stopBot(ctx.user.id);
+        return result;
+      } catch (error: any) {
+        console.error("[Trading] Stop bot error:", error);
+        return { success: false, error: error.message };
+      }
+    }),
+
+    getBotStatus: protectedProcedure.query(async ({ ctx }) => {
+      try {
+        const { getBotStatus } = await import("./tradingBot");
+        const status = getBotStatus(ctx.user.id);
+        return status;
+      } catch (error: any) {
+        console.error("[Trading] Get bot status error:", error);
+        return { running: false };
+      }
+    }),
   }),
 });
 

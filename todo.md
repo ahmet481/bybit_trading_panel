@@ -54,3 +54,20 @@
 - [x] Bybit API bağlantısını test et ve hata mesajlarını göster
 - [x] Dashboard'da bakiye çekme prosedürünü düzélt
 - [x] API hata mesajlarını kullanıcı arayüzünde göster
+
+
+## 🆕 FEATURE - API Anahtarı Kalıcı Depolama
+- [x] API anahtarını localStorage'da kalıcı olarak sakla
+- [x] Kullanıcı giriş yaptığında API anahtarını otomatik yükle
+- [x] Dashboard'da API anahtarı durumunu göster (bağlı/bağlı değil)
+- [x] API anahtarını değiştirme seçeneği ekle
+
+
+## 🤖 OTOMATİK TRADING BOT (ÖNCELİK)
+- [ ] Bybit API ile gerçek işlem açma (Long/Short)
+- [ ] RSI + MACD + Formasyon stratejisi uygula
+- [ ] Stop-loss ve take-profit otomatik ayarla
+- [ ] Risk yönetimi (maksimum kayıp limiti)
+- [ ] Pozisyon takibi ve kar/kayıp hesaplama
+- [ ] Bot'u belirli aralıklarla çalıştır (1 dakika/5 dakika)
+- [ ] İşlem geçmişini veritabanına kaydet

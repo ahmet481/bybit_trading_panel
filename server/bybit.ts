@@ -2,7 +2,7 @@ import axios, { AxiosInstance } from "axios";
 import crypto from "crypto";
 
 /**
- * Bybit API Manager - Cüzdan ve piyasa verilerine erişim
+ * Bybit API Manager - Cüzdan, piyasa verileri ve işlem yönetimi
  */
 export class BybitManager {
   private apiKey: string;
@@ -13,7 +13,6 @@ export class BybitManager {
   constructor(apiKey: string, apiSecret: string, isMainnet: boolean = true) {
     this.apiKey = apiKey;
     this.apiSecret = apiSecret;
-    // Mainnet'e bağlan (varsayılan)
     this.baseURL = "https://api.bybit.com";
 
     this.client = axios.create({
@@ -23,19 +22,13 @@ export class BybitManager {
   }
 
   /**
-   * İstek imzasını oluştur
+   * Bybit V5 API imzası oluştur
    */
-  private generateSignature(params: Record<string, any>, timestamp: number): string {
-    const queryString = Object.keys(params)
-      .sort()
-      .map((key) => `${key}=${params[key]}`)
-      .join("&");
-
-    const message = `${queryString}${timestamp}`;
-
+  private generateSignature(timestamp: number, recvWindow: number, queryString: string): string {
+    const preSign = `${timestamp}${this.apiKey}${recvWindow}${queryString}`;
     return crypto
       .createHmac("sha256", this.apiSecret)
-      .update(message)
+      .update(preSign)
       .digest("hex");
   }
 
@@ -45,33 +38,255 @@ export class BybitManager {
   async getBalance(coin: string = "USDT") {
     try {
       const timestamp = Date.now();
-      const params = {
-        accountType: "UNIFIED",
-        coin,
-      };
-
-      const signature = this.generateSignature(params, timestamp);
+      const recvWindow = 5000;
+      const params = `accountType=UNIFIED&coin=${coin}`;
+      const signature = this.generateSignature(timestamp, recvWindow, params);
 
       console.log("[Bybit] Fetching balance...", { baseURL: this.baseURL, coin });
 
-      const response = await this.client.get("/v5/account/wallet-balance", {
-        params,
+      const response = await this.client.get(`/v5/account/wallet-balance?${params}`, {
         headers: {
           "X-BAPI-SIGN": signature,
           "X-BAPI-API-KEY": this.apiKey,
-          "X-BAPI-TIMESTAMP": timestamp,
+          "X-BAPI-TIMESTAMP": timestamp.toString(),
+          "X-BAPI-RECV-WINDOW": recvWindow.toString(),
         },
       });
 
       console.log("[Bybit] Balance response:", response.data);
+      
+      if (response.data.retCode !== 0) {
+        throw new Error(response.data.retMsg);
+      }
+      
       return response.data.result.list[0]?.coin[0]?.walletBalance || "0";
     } catch (error: any) {
       console.error("[Bybit] Balance Error:", {
         message: error.message,
         status: error.response?.status,
-        statusText: error.response?.statusText,
         data: error.response?.data,
       });
+      throw error;
+    }
+  }
+
+  /**
+   * Açık pozisyonları al
+   */
+  async getPositions(symbol?: string) {
+    try {
+      const timestamp = Date.now();
+      const recvWindow = 5000;
+      const params = symbol 
+        ? `category=linear&symbol=${symbol}` 
+        : `category=linear&settleCoin=USDT`;
+      const signature = this.generateSignature(timestamp, recvWindow, params);
+
+      const response = await this.client.get(`/v5/position/list?${params}`, {
+        headers: {
+          "X-BAPI-SIGN": signature,
+          "X-BAPI-API-KEY": this.apiKey,
+          "X-BAPI-TIMESTAMP": timestamp.toString(),
+          "X-BAPI-RECV-WINDOW": recvWindow.toString(),
+        },
+      });
+
+      if (response.data.retCode !== 0) {
+        throw new Error(response.data.retMsg);
+      }
+
+      return response.data.result.list || [];
+    } catch (error: any) {
+      console.error("[Bybit] Positions Error:", error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * İşlem aç (Long/Short)
+   */
+  async placeOrder(
+    symbol: string,
+    side: "Buy" | "Sell",
+    qty: string,
+    orderType: "Market" | "Limit" = "Market",
+    price?: string,
+    stopLoss?: string,
+    takeProfit?: string
+  ) {
+    try {
+      const timestamp = Date.now();
+      const recvWindow = 5000;
+
+      const orderData: any = {
+        category: "linear",
+        symbol,
+        side,
+        orderType,
+        qty,
+        timeInForce: "GTC",
+      };
+
+      if (orderType === "Limit" && price) {
+        orderData.price = price;
+      }
+
+      if (stopLoss) {
+        orderData.stopLoss = stopLoss;
+      }
+
+      if (takeProfit) {
+        orderData.takeProfit = takeProfit;
+      }
+
+      const jsonBody = JSON.stringify(orderData);
+      const signature = this.generateSignature(timestamp, recvWindow, jsonBody);
+
+      console.log("[Bybit] Placing order:", orderData);
+
+      const response = await this.client.post("/v5/order/create", orderData, {
+        headers: {
+          "Content-Type": "application/json",
+          "X-BAPI-SIGN": signature,
+          "X-BAPI-API-KEY": this.apiKey,
+          "X-BAPI-TIMESTAMP": timestamp.toString(),
+          "X-BAPI-RECV-WINDOW": recvWindow.toString(),
+        },
+      });
+
+      console.log("[Bybit] Order response:", response.data);
+
+      if (response.data.retCode !== 0) {
+        throw new Error(response.data.retMsg);
+      }
+
+      return {
+        success: true,
+        orderId: response.data.result.orderId,
+        data: response.data.result,
+      };
+    } catch (error: any) {
+      console.error("[Bybit] Order Error:", {
+        message: error.message,
+        data: error.response?.data,
+      });
+      return {
+        success: false,
+        error: error.response?.data?.retMsg || error.message,
+      };
+    }
+  }
+
+  /**
+   * Pozisyonu kapat
+   */
+  async closePosition(symbol: string, side: "Buy" | "Sell", qty: string) {
+    // Pozisyonu kapatmak için ters yönde işlem aç
+    const closeSide = side === "Buy" ? "Sell" : "Buy";
+    return this.placeOrder(symbol, closeSide, qty, "Market");
+  }
+
+  /**
+   * Stop-Loss ve Take-Profit güncelle
+   */
+  async setTradingStop(
+    symbol: string,
+    stopLoss?: string,
+    takeProfit?: string,
+    positionIdx: number = 0
+  ) {
+    try {
+      const timestamp = Date.now();
+      const recvWindow = 5000;
+
+      const data: any = {
+        category: "linear",
+        symbol,
+        positionIdx,
+      };
+
+      if (stopLoss) data.stopLoss = stopLoss;
+      if (takeProfit) data.takeProfit = takeProfit;
+
+      const jsonBody = JSON.stringify(data);
+      const signature = this.generateSignature(timestamp, recvWindow, jsonBody);
+
+      const response = await this.client.post("/v5/position/trading-stop", data, {
+        headers: {
+          "Content-Type": "application/json",
+          "X-BAPI-SIGN": signature,
+          "X-BAPI-API-KEY": this.apiKey,
+          "X-BAPI-TIMESTAMP": timestamp.toString(),
+          "X-BAPI-RECV-WINDOW": recvWindow.toString(),
+        },
+      });
+
+      if (response.data.retCode !== 0) {
+        throw new Error(response.data.retMsg);
+      }
+
+      return { success: true, data: response.data.result };
+    } catch (error: any) {
+      console.error("[Bybit] Trading Stop Error:", error.message);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Kaldıraç ayarla
+   */
+  async setLeverage(symbol: string, leverage: number) {
+    try {
+      const timestamp = Date.now();
+      const recvWindow = 5000;
+
+      const data = {
+        category: "linear",
+        symbol,
+        buyLeverage: leverage.toString(),
+        sellLeverage: leverage.toString(),
+      };
+
+      const jsonBody = JSON.stringify(data);
+      const signature = this.generateSignature(timestamp, recvWindow, jsonBody);
+
+      const response = await this.client.post("/v5/position/set-leverage", data, {
+        headers: {
+          "Content-Type": "application/json",
+          "X-BAPI-SIGN": signature,
+          "X-BAPI-API-KEY": this.apiKey,
+          "X-BAPI-TIMESTAMP": timestamp.toString(),
+          "X-BAPI-RECV-WINDOW": recvWindow.toString(),
+        },
+      });
+
+      if (response.data.retCode !== 0 && response.data.retCode !== 110043) {
+        // 110043 = leverage already set
+        throw new Error(response.data.retMsg);
+      }
+
+      return { success: true };
+    } catch (error: any) {
+      console.error("[Bybit] Leverage Error:", error.message);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Güncel fiyatı al
+   */
+  async getCurrentPrice(symbol: string = "BTCUSDT") {
+    try {
+      const response = await this.client.get("/v5/market/tickers", {
+        params: {
+          category: "linear",
+          symbol,
+        },
+      });
+
+      return parseFloat(response.data.result.list[0]?.lastPrice || "0");
+    } catch (error) {
+      console.error("[Bybit] Price Error:", error);
       throw error;
     }
   }
@@ -123,7 +338,6 @@ export class BybitManager {
         },
       });
 
-      // Verileri DataFrame'e dönüştürülecek formata çevir
       const data = response.data.result.list.map((item: any[]) => ({
         timestamp: parseInt(item[0]),
         open: parseFloat(item[1]),
@@ -133,7 +347,7 @@ export class BybitManager {
         volume: parseFloat(item[5]),
       }));
 
-      return data.reverse(); // Eski veriden yeniye sırala
+      return data.reverse();
     } catch (error) {
       console.error("Bybit Kline Error:", error);
       throw error;

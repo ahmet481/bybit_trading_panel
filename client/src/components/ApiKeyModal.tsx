@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useAuth } from "@/_core/hooks/useAuth";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,13 +13,19 @@ interface ApiKeyModalProps {
 }
 
 export default function ApiKeyModal({ open, onOpenChange }: ApiKeyModalProps) {
+  const { user } = useAuth();
   const [apiKey, setApiKey] = useState("");
   const [apiSecret, setApiSecret] = useState("");
   const [showSecret, setShowSecret] = useState(false);
 
   const saveApiKeyMutation = trpc.trading.saveApiKey.useMutation({
     onSuccess: () => {
-      toast.success("API anahtarları kaydedildi");
+      // localStorage'a kaydet
+      if (user) {
+        localStorage.setItem(`apiKey_${user.id}`, apiKey);
+        localStorage.setItem(`apiSecret_${user.id}`, apiSecret);
+      }
+      toast.success("API anahtarı kaydedildi ve kalıcı olarak saklandı");
       setApiKey("");
       setApiSecret("");
       onOpenChange(false);
