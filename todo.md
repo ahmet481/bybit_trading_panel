@@ -98,3 +98,11 @@
 - [x] İşlem bazlı kar/zarar hesaplaması
 - [x] Dashboard'da PnL gösterimi
 - [x] İşlem detayları (entry, exit, profit %)
+
+
+## 🐛 BUG - API Anahtarı Sorunu & Grafik
+- [x] API anahtarı kontrol mekanizmasını düzelt
+- [ ] Bot işlem açmasını sağla (gerçek işlem yürütme)
+- [x] Grafik tasarımını profesyonel hale getir
+- [x] Mum kapınışa kalan zamanı göster (tüm timeframe'ler)
+- [x] Geçmiş mumları grafiklerde göster
