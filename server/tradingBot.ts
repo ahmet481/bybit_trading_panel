@@ -164,8 +164,8 @@ export class TradingBot {
       reasons.push("Düşüş trendi");
     }
 
-    // Minimum güven eşiği
-    if (confidence < 50) {
+    // Minimum güven eşiği (gevşetildi)
+    if (confidence < 30) {
       signal = "hold";
     }
 
@@ -312,8 +312,8 @@ export class TradingBot {
           const analysis = await this.analyzeMarket();
           console.log("[TradingBot] Analysis:", analysis);
 
-          // Sinyal varsa işlem aç
-          if (analysis.signal !== "hold" && analysis.confidence >= 60) {
+          // Sinyal varsa işlem aç (confidence eşiği düşürüldü)
+          if (analysis.signal !== "hold" && analysis.confidence >= 30) {
             const result = await this.executeTrade(
               analysis.signal,
               analysis.confidence,
