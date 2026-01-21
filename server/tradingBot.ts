@@ -71,8 +71,8 @@ export class TradingBot {
   }> {
     if (!this.bybit) throw new Error("Bot not initialized");
 
-    // K-Line verilerini al
-    const klines = await this.bybit.getKlines(this.symbol, "15", 100);
+    // K-Line verilerini al (1 dakikalık mumlar daha sık sinyaller için)
+    const klines = await this.bybit.getKlines(this.symbol, "1", 100);
     const closes = klines.map((k: any) => k.close);
     const highs = klines.map((k: any) => k.high);
     const lows = klines.map((k: any) => k.low);
@@ -106,15 +106,23 @@ export class TradingBot {
     let reasons: string[] = [];
     let pattern: string | null = null;
 
-    // RSI Analizi
-    if (rsi < 30) {
+    // RSI Analizi (daha gevşek eşikler)
+    if (rsi < 35) {
       signal = "buy";
-      confidence += 30;
-      reasons.push("RSI aşırı satım bölgesinde");
-    } else if (rsi > 70) {
+      confidence += 25;
+      reasons.push("RSI satım bölgesinde");
+    } else if (rsi > 65) {
       signal = "sell";
-      confidence += 30;
-      reasons.push("RSI aşırı alım bölgesinde");
+      confidence += 25;
+      reasons.push("RSI alım bölgesinde");
+    } else if (rsi < 50) {
+      signal = "buy";
+      confidence += 10;
+      reasons.push("RSI düşüş trendi");
+    } else if (rsi > 50) {
+      signal = "sell";
+      confidence += 10;
+      reasons.push("RSI yükseliş trendi");
     }
 
     // MACD Analizi
@@ -164,8 +172,8 @@ export class TradingBot {
       reasons.push("Düşüş trendi");
     }
 
-    // Minimum güven eşiği (gevşetildi)
-    if (confidence < 30) {
+    // Minimum güven eşiği (çok gevşetildi - daha kolay işlem açsın)
+    if (confidence < 15) {
       signal = "hold";
     }
 
@@ -312,8 +320,8 @@ export class TradingBot {
           const analysis = await this.analyzeMarket();
           console.log("[TradingBot] Analysis:", analysis);
 
-          // Sinyal varsa işlem aç (confidence eşiği düşürüldü)
-          if (analysis.signal !== "hold" && analysis.confidence >= 30) {
+          // Sinyal varsa işlem aç (confidence eşiği çok düşürüldü)
+          if (analysis.signal !== "hold" && analysis.confidence >= 15) {
             const result = await this.executeTrade(
               analysis.signal,
               analysis.confidence,
@@ -325,12 +333,11 @@ export class TradingBot {
           console.log("[TradingBot] Open position exists, skipping...");
         }
 
-        // 1 dakika bekle
-        await new Promise((resolve) => setTimeout(resolve, 60000));
+        // 20 saniye        // 20 saniye bekle (daha sık analiz)
+        await new Promise((resolve) => setTimeout(resolve, 20000));
       } catch (error) {
         console.error("[TradingBot] Error in loop:", error);
-        await new Promise((resolve) => setTimeout(resolve, 30000));
-      }
+        await new Promise((resolve) => setTimeout(resolve, 10000));      }
     }
   }
 

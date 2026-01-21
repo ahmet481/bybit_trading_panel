@@ -15,7 +15,7 @@ import { toast } from "sonner";
 import { OpenPositions } from "@/components/OpenPositions";
 import { CandlestickChart } from "@/components/CandlestickChart";
 import { TradeHistory } from "@/components/TradeHistory";
-import { ProfessionalChart } from "@/components/ProfessionalChart";
+import { CandlestickChartLW } from "@/components/CandlestickChartLW";
 
 const SYMBOLS = ["BTCUSDT", "ETHUSDT", "BNBUSDT", "ADAUSDT", "DOGEUSDT"];
 
@@ -261,7 +261,7 @@ export default function Dashboard() {
         {/* Profesyonel Grafik */}
         {chartData?.data && chartData.data.length > 0 && (
           <div className="mb-8">
-            <ProfessionalChart symbol={selectedSymbol} data={chartData.data} />
+            <CandlestickChartLW symbol={selectedSymbol} data={chartData.data} />
           </div>
         )}
 
