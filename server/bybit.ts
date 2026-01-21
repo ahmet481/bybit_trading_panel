@@ -98,7 +98,7 @@ export class BybitManager {
       return response.data.result.list || [];
     } catch (error: any) {
       console.error("[Bybit] Positions Error:", error.message);
-      throw error;
+      return [];
     }
   }
 
@@ -349,7 +349,7 @@ export class BybitManager {
 
       return data.reverse();
     } catch (error) {
-      console.error("Bybit Kline Error:", error);
+      console.error("[Bybit] Kline Error:", error);
       throw error;
     }
   }
@@ -370,6 +370,36 @@ export class BybitManager {
     } catch (error) {
       console.error("Bybit Ticker Error:", error);
       throw error;
+    }
+  }
+
+  /**
+   * İşlem geçmişini al
+   */
+  async getTradeHistory(symbol: string = "BTCUSDT", limit: number = 20) {
+    try {
+      const timestamp = Date.now();
+      const recvWindow = 5000;
+      const params = `category=linear&symbol=${symbol}&limit=${limit}`;
+      const signature = this.generateSignature(timestamp, recvWindow, params);
+
+      const response = await this.client.get(`/v5/execution/list?${params}`, {
+        headers: {
+          "X-BAPI-SIGN": signature,
+          "X-BAPI-API-KEY": this.apiKey,
+          "X-BAPI-TIMESTAMP": timestamp.toString(),
+          "X-BAPI-RECV-WINDOW": recvWindow.toString(),
+        },
+      });
+
+      if (response.data.retCode !== 0) {
+        throw new Error(response.data.retMsg);
+      }
+
+      return response.data.result.list || [];
+    } catch (error: any) {
+      console.error("[Bybit] Trade history error:", error.message);
+      return [];
     }
   }
 }

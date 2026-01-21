@@ -78,3 +78,13 @@
 - [ ] İşlem geçmişi tablosu
 - [ ] Profesyonel mum grafikleri (candlestick)
 - [ ] Teknik göstergeler (RSI, MACD, Bollinger Bands)
+
+
+## 🆕 FEATURE - Grafik İnteraktivitesi & Gerçek Veriler
+- [x] Grafik pan/zoom kontrolleri (fareyle sürükleme)
+- [x] Timeframe değiştiğinde grafik verisi güncellemesi
+- [x] Açık pozisyonları Bybit API'den çekme
+- [x] Açık pozisyonları dashboard'da gösterme
+- [x] İşlem geçmişini Bybit API'den çekme
+- [x] İşlem geçmişini dashboard'da gösterme
+- [ ] Bot sinyalleri log paneli

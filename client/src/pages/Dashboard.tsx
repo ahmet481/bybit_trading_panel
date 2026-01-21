@@ -29,6 +29,7 @@ export default function Dashboard() {
   const [tradeQuantity, setTradeQuantity] = useState("");
   const [stopLoss, setStopLoss] = useState("");
   const [takeProfit, setTakeProfit] = useState("");
+  const [chartInterval, setChartInterval] = useState("60");
 
   // API anahtarlarını otomatik yükle
   useEffect(() => {
@@ -44,10 +45,27 @@ export default function Dashboard() {
 
   const { data: balance, isLoading: balanceLoading } = trpc.trading.getBalance.useQuery();
   const { data: botStatus } = trpc.trading.getBotStatus.useQuery();
-  const { data: chartData } = trpc.trading.getChartData.useQuery({
-    symbol: selectedSymbol,
-    interval: "60",
-  });
+  const { data: chartData, refetch: refetchChartData } = trpc.trading.getChartData.useQuery(
+    {
+      symbol: selectedSymbol,
+      interval: chartInterval,
+    },
+    {
+      refetchInterval: 30000,
+    }
+  );
+  const { data: openPositions } = trpc.trading.getOpenPositions.useQuery(
+    { symbol: selectedSymbol },
+    {
+      refetchInterval: 10000,
+    }
+  );
+  const { data: tradeHistory } = trpc.trading.getTradeHistory.useQuery(
+    { symbol: selectedSymbol, limit: 20 },
+    {
+      refetchInterval: 15000,
+    }
+  );
 
   const handleTrade = async () => {
     if (!tradeQuantity || !stopLoss || !takeProfit) {
@@ -94,6 +112,18 @@ export default function Dashboard() {
     } catch (error) {
       toast.error("Bot durdurma hatası");
     }
+  };
+
+  const handleTimeframeChange = (tf: string) => {
+    const intervalMap: Record<string, string> = {
+      "1m": "1",
+      "5m": "5",
+      "15m": "15",
+      "1h": "60",
+      "4h": "240",
+      "1d": "1440",
+    };
+    setChartInterval(intervalMap[tf] || "60");
   };
 
   if (!isAuthenticated) {
@@ -256,26 +286,138 @@ export default function Dashboard() {
               </div>
             </CardContent>
           </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">Açık Pozisyonlar</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-gray-900">
+                {openPositions?.positions?.length || 0}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">Toplam İşlem</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-gray-900">
+                {tradeHistory?.trades?.length || 0}
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Profesyonel Grafik */}
         {chartData?.data && chartData.data.length > 0 && (
           <div className="mb-8">
-            <CandlestickChartLW symbol={selectedSymbol} data={chartData.data} />
+            <CandlestickChartLW 
+              symbol={selectedSymbol} 
+              data={chartData.data}
+              onTimeframeChange={handleTimeframeChange}
+            />
           </div>
         )}
 
         {/* Açık İşlemler */}
         <div className="mb-8">
-          <OpenPositions positions={[]} />
+          <Card>
+            <CardHeader>
+              <CardTitle>Açık Pozisyonlar</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {openPositions?.positions && openPositions.positions.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left py-2">Sembol</th>
+                        <th className="text-left py-2">Yön</th>
+                        <th className="text-left py-2">Miktar</th>
+                        <th className="text-left py-2">Giriş Fiyatı</th>
+                        <th className="text-left py-2">Cari Fiyat</th>
+                        <th className="text-left py-2">PnL</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {openPositions.positions.map((pos: any, i: number) => (
+                        <tr key={i} className="border-b">
+                          <td className="py-2">{pos.symbol}</td>
+                          <td className="py-2">
+                            <span className={pos.side === "Buy" ? "text-green-600" : "text-red-600"}>
+                              {pos.side === "Buy" ? "📈 Long" : "📉 Short"}
+                            </span>
+                          </td>
+                          <td className="py-2">{pos.size}</td>
+                          <td className="py-2">${parseFloat(pos.entryPrice).toFixed(2)}</td>
+                          <td className="py-2">${parseFloat(pos.markPrice).toFixed(2)}</td>
+                          <td className={`py-2 font-bold ${parseFloat(pos.unrealisedPnl) >= 0 ? "text-green-600" : "text-red-600"}`}>
+                            ${parseFloat(pos.unrealisedPnl).toFixed(2)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className="text-gray-500">Açık pozisyon yok</p>
+              )}
+            </CardContent>
+          </Card>
         </div>
 
         {/* İşlem Geçmişi */}
         <div className="mb-8">
-          <TradeHistory trades={[]} />
+          <Card>
+            <CardHeader>
+              <CardTitle>İşlem Geçmişi</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {tradeHistory?.trades && tradeHistory.trades.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left py-2">Sembol</th>
+                        <th className="text-left py-2">Yön</th>
+                        <th className="text-left py-2">Fiyat</th>
+                        <th className="text-left py-2">Miktar</th>
+                        <th className="text-left py-2">Durum</th>
+                        <th className="text-left py-2">Zaman</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {tradeHistory.trades.map((trade: any, i: number) => (
+                        <tr key={i} className="border-b">
+                          <td className="py-2">{trade.symbol}</td>
+                          <td className="py-2">
+                            <span className={trade.side === "Buy" ? "text-green-600" : "text-red-600"}>
+                              {trade.side === "Buy" ? "📈 Alış" : "📉 Satış"}
+                            </span>
+                          </td>
+                          <td className="py-2">${parseFloat(trade.price).toFixed(2)}</td>
+                          <td className="py-2">{trade.qty}</td>
+                          <td className="py-2">
+                            <span className={trade.status === "Filled" ? "text-green-600" : "text-yellow-600"}>
+                              {trade.status}
+                            </span>
+                          </td>
+                          <td className="py-2 text-gray-500">
+                            {new Date(parseInt(trade.createdTime)).toLocaleString("tr-TR")}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className="text-gray-500">İşlem geçmişi yok</p>
+              )}
+            </CardContent>
+          </Card>
         </div>
-
-
 
         {/* Bot Controls */}
         <div className="bg-white rounded-lg shadow p-6">

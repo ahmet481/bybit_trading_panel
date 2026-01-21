@@ -136,6 +136,32 @@ export const appRouter = router({
         return { running: false };
       }
     }),
+
+    getOpenPositions: protectedProcedure
+      .input(z.object({ symbol: z.string() }))
+      .query(async ({ input }) => {
+        try {
+          const bybit = new BybitManager("dummy", "dummy");
+          const positions = await bybit.getPositions(input.symbol);
+          return { positions, error: null };
+        } catch (error: any) {
+          console.error("[Trading] Get positions error:", error);
+          return { positions: [], error: String(error.message) };
+        }
+      }),
+
+    getTradeHistory: protectedProcedure
+      .input(z.object({ symbol: z.string(), limit: z.number().default(20) }))
+      .query(async ({ input }) => {
+        try {
+          const bybit = new BybitManager("dummy", "dummy");
+          const trades = await bybit.getTradeHistory(input.symbol, input.limit);
+          return { trades, error: null };
+        } catch (error: any) {
+          console.error("[Trading] Get trade history error:", error);
+          return { trades: [], error: String(error.message) };
+        }
+      }),
   }),
 });
 

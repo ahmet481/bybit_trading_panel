@@ -22,6 +22,39 @@ export const CandlestickChartLW: React.FC<CandlestickChartLWProps> = ({
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [timeframe, setTimeframe] = useState("1h");
+  const [scrollOffset, setScrollOffset] = useState(0);
+  const [zoom, setZoom] = useState(1);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState(0);
+
+  const handleTimeframeChange = (tf: string) => {
+    setTimeframe(tf);
+    setScrollOffset(0);
+    setZoom(1);
+    onTimeframeChange?.(tf);
+  };
+
+  const handleWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+    const newZoom = Math.max(0.5, Math.min(3, zoom + (e.deltaY > 0 ? -0.1 : 0.1)));
+    setZoom(newZoom);
+  };
+
+  const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    setIsDragging(true);
+    setDragStart(e.clientX);
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!isDragging) return;
+    const delta = e.clientX - dragStart;
+    setScrollOffset(scrollOffset + delta);
+    setDragStart(e.clientX);
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
 
   useEffect(() => {
     if (!canvasRef.current || data.length === 0) return;
@@ -74,19 +107,31 @@ export const CandlestickChartLW: React.FC<CandlestickChartLWProps> = ({
       ctx.fillText(price.toFixed(2), width - padding + 10, y + 4);
     }
 
+    // Mum genişliğini zoom'a göre ayarla
+    const baseCandleWidth = chartWidth / data.length;
+    const candleWidth = baseCandleWidth * zoom;
+    const totalWidth = candleWidth * data.length;
+
     // Dikey grid çizgileri
-    const candleWidth = chartWidth / data.length;
-    for (let i = 0; i < data.length; i += Math.ceil(data.length / 6)) {
-      const x = padding + (candleWidth * i + candleWidth / 2);
-      ctx.beginPath();
-      ctx.moveTo(x, padding);
-      ctx.lineTo(x, height - padding);
-      ctx.stroke();
+    const gridInterval = Math.ceil(data.length / 6);
+    for (let i = 0; i < data.length; i += gridInterval) {
+      const x = padding + scrollOffset + (candleWidth * i + candleWidth / 2);
+      if (x > padding && x < width - padding) {
+        ctx.beginPath();
+        ctx.moveTo(x, padding);
+        ctx.lineTo(x, height - padding);
+        ctx.stroke();
+      }
     }
 
     // Mumları çiz
     data.forEach((candle, index) => {
-      const x = padding + candleWidth * index + candleWidth / 2;
+      const x = padding + scrollOffset + candleWidth * index + candleWidth / 2;
+
+      // Ekranda görünür mü kontrol et
+      if (x + candleWidth / 2 < padding || x - candleWidth / 2 > width - padding) {
+        return;
+      }
 
       // Fiyat Y koordinatlarını hesapla
       const getY = (price: number) => {
@@ -132,25 +177,23 @@ export const CandlestickChartLW: React.FC<CandlestickChartLWProps> = ({
     ctx.fillStyle = "#9ca3af";
     ctx.font = "12px Arial";
     ctx.textAlign = "center";
-    for (let i = 0; i < data.length; i += Math.ceil(data.length / 6)) {
-      const x = padding + candleWidth * i + candleWidth / 2;
-      const time = new Date(data[i].time * 1000).toLocaleTimeString("tr-TR", {
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-      ctx.fillText(time, x, height - padding + 20);
+    for (let i = 0; i < data.length; i += gridInterval) {
+      const x = padding + scrollOffset + candleWidth * i + candleWidth / 2;
+      if (x > padding && x < width - padding) {
+        const time = new Date(data[i].time * 1000).toLocaleTimeString("tr-TR", {
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+        ctx.fillText(time, x, height - padding + 20);
+      }
     }
 
-    // Responsive
-    const handleResize = () => {
-      if (canvasRef.current) {
-        canvasRef.current.width = canvasRef.current.offsetWidth;
-      }
-    };
-
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, [data]);
+    // Zoom seviyesi göster
+    ctx.fillStyle = "#9ca3af";
+    ctx.font = "12px Arial";
+    ctx.textAlign = "left";
+    ctx.fillText(`Zoom: ${zoom.toFixed(1)}x`, padding + 10, 20);
+  }, [data, scrollOffset, zoom]);
 
   return (
     <div className="w-full bg-gray-900 rounded-lg border border-gray-700 overflow-hidden">
@@ -168,10 +211,7 @@ export const CandlestickChartLW: React.FC<CandlestickChartLWProps> = ({
           {["1m", "5m", "15m", "1h", "4h", "1d"].map((tf) => (
             <button
               key={tf}
-              onClick={() => {
-                setTimeframe(tf);
-                onTimeframeChange?.(tf);
-              }}
+              onClick={() => handleTimeframeChange(tf)}
               className={`px-3 py-1 rounded text-sm font-medium transition ${
                 timeframe === tf
                   ? "bg-blue-600 text-white"
@@ -187,9 +227,19 @@ export const CandlestickChartLW: React.FC<CandlestickChartLWProps> = ({
       {/* Grafik */}
       <canvas
         ref={canvasRef}
-        className="w-full bg-gray-900"
+        className="w-full bg-gray-900 cursor-grab active:cursor-grabbing"
         style={{ display: "block" }}
+        onWheel={handleWheel}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
       />
+
+      {/* Kontrol Talimatları */}
+      <div className="px-4 py-2 bg-gray-800 text-xs text-gray-400 border-t border-gray-700">
+        <span>💡 Fare tekerleği: Zoom | Sürükle: Pan | Timeframe: Veri güncelle</span>
+      </div>
 
       {/* Alt Bilgi Paneli */}
       <div className="grid grid-cols-4 gap-4 p-4 border-t border-gray-700 bg-gray-800 text-sm">
