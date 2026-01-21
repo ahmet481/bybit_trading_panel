@@ -162,6 +162,44 @@ export const appRouter = router({
           return { trades: [], error: String(error.message) };
         }
       }),
+
+    getTradeStats: protectedProcedure.query(async ({ ctx }) => {
+      try {
+        const stats = await db.getTradeStats(ctx.user.id);
+        return stats || {
+          totalTrades: 0,
+          winningTrades: 0,
+          losingTrades: 0,
+          winRate: "0",
+          totalPnL: "0",
+          avgPnL: "0",
+          profitFactor: "0",
+        };
+      } catch (error: any) {
+        console.error("[Trading] Get trade stats error:", error);
+        return {
+          totalTrades: 0,
+          winningTrades: 0,
+          losingTrades: 0,
+          winRate: "0",
+          totalPnL: "0",
+          avgPnL: "0",
+          profitFactor: "0",
+        };
+      }
+    }),
+
+    getUserTrades: protectedProcedure
+      .input(z.object({ limit: z.number().default(50) }))
+      .query(async ({ ctx, input }) => {
+        try {
+          const trades = await db.getUserTrades(ctx.user.id, input.limit);
+          return { trades, error: null };
+        } catch (error: any) {
+          console.error("[Trading] Get user trades error:", error);
+          return { trades: [], error: String(error.message) };
+        }
+      }),
   }),
 });
 

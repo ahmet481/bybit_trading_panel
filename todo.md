@@ -88,3 +88,13 @@
 - [x] İşlem geçmişini Bybit API'den çekme
 - [x] İşlem geçmişini dashboard'da gösterme
 - [ ] Bot sinyalleri log paneli
+
+
+## 🐛 BUG - Bot Kar Etmiyor
+- [x] Bot stratejisini iyileştir (daha güvenilir sinyaller)
+- [x] RSI + MACD kombinasyonunu güçlendir
+- [x] Trend analizi ekle (EMA crossover)
+- [x] Volatilite kontrolü ekle
+- [x] İşlem bazlı kar/zarar hesaplaması
+- [x] Dashboard'da PnL gösterimi
+- [x] İşlem detayları (entry, exit, profit %)

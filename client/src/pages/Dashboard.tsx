@@ -66,6 +66,18 @@ export default function Dashboard() {
       refetchInterval: 15000,
     }
   );
+  const { data: tradeStats } = trpc.trading.getTradeStats.useQuery(
+    undefined,
+    {
+      refetchInterval: 20000,
+    }
+  );
+  const { data: userTrades } = trpc.trading.getUserTrades.useQuery(
+    { limit: 50 },
+    {
+      refetchInterval: 20000,
+    }
+  );
 
   const handleTrade = async () => {
     if (!tradeQuantity || !stopLoss || !takeProfit) {
@@ -289,23 +301,25 @@ export default function Dashboard() {
 
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Açık Pozisyonlar</CardTitle>
+              <CardTitle className="text-sm font-medium">Toplam PnL</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-gray-900">
-                {openPositions?.positions?.length || 0}
+              <div className={`text-2xl font-bold ${parseFloat(tradeStats?.totalPnL || "0") >= 0 ? "text-green-600" : "text-red-600"}`}>
+                ${tradeStats?.totalPnL || "0"}
               </div>
+              <p className="text-xs text-gray-500 mt-1">Win Rate: {tradeStats?.winRate}%</p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Toplam İşlem</CardTitle>
+              <CardTitle className="text-sm font-medium">İşlem İstatistikleri</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-gray-900">
-                {tradeHistory?.trades?.length || 0}
-              </div>
+              <div className="text-2xl font-bold text-gray-900">{tradeStats?.totalTrades || 0} işlem</div>
+              <p className="text-xs text-gray-500 mt-1">
+                Kazanan: {tradeStats?.winningTrades || 0} | Kaybeden: {tradeStats?.losingTrades || 0}
+              </p>
             </CardContent>
           </Card>
         </div>
@@ -372,40 +386,44 @@ export default function Dashboard() {
         <div className="mb-8">
           <Card>
             <CardHeader>
-              <CardTitle>İşlem Geçmişi</CardTitle>
+              <CardTitle>İşlem Geçmişi (Son 50)</CardTitle>
             </CardHeader>
             <CardContent>
-              {tradeHistory?.trades && tradeHistory.trades.length > 0 ? (
+              {userTrades?.trades && userTrades.trades.length > 0 ? (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b">
                         <th className="text-left py-2">Sembol</th>
                         <th className="text-left py-2">Yön</th>
-                        <th className="text-left py-2">Fiyat</th>
+                        <th className="text-left py-2">Giriş</th>
+                        <th className="text-left py-2">Çıkış</th>
                         <th className="text-left py-2">Miktar</th>
-                        <th className="text-left py-2">Durum</th>
+                        <th className="text-left py-2">PnL</th>
+                        <th className="text-left py-2">PnL %</th>
                         <th className="text-left py-2">Zaman</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {tradeHistory.trades.map((trade: any, i: number) => (
-                        <tr key={i} className="border-b">
-                          <td className="py-2">{trade.symbol}</td>
+                      {userTrades.trades.map((trade: any, i: number) => (
+                        <tr key={i} className="border-b hover:bg-gray-50">
+                          <td className="py-2 font-medium">{trade.symbol}</td>
                           <td className="py-2">
-                            <span className={trade.side === "Buy" ? "text-green-600" : "text-red-600"}>
-                              {trade.side === "Buy" ? "📈 Alış" : "📉 Satış"}
+                            <span className={trade.side === "buy" ? "text-green-600" : "text-red-600"}>
+                              {trade.side === "buy" ? "📈 Alış" : "📉 Satış"}
                             </span>
                           </td>
-                          <td className="py-2">${parseFloat(trade.price).toFixed(2)}</td>
-                          <td className="py-2">{trade.qty}</td>
-                          <td className="py-2">
-                            <span className={trade.status === "Filled" ? "text-green-600" : "text-yellow-600"}>
-                              {trade.status}
-                            </span>
+                          <td className="py-2">${parseFloat(trade.entryPrice).toFixed(2)}</td>
+                          <td className="py-2">${parseFloat(trade.exitPrice).toFixed(2)}</td>
+                          <td className="py-2">{trade.quantity}</td>
+                          <td className={`py-2 font-bold ${parseFloat(trade.pnl) >= 0 ? "text-green-600" : "text-red-600"}`}>
+                            ${parseFloat(trade.pnl).toFixed(2)}
                           </td>
-                          <td className="py-2 text-gray-500">
-                            {new Date(parseInt(trade.createdTime)).toLocaleString("tr-TR")}
+                          <td className={`py-2 font-bold ${parseFloat(trade.pnlPercent) >= 0 ? "text-green-600" : "text-red-600"}`}>
+                            {parseFloat(trade.pnlPercent).toFixed(2)}%
+                          </td>
+                          <td className="py-2 text-gray-500 text-xs">
+                            {new Date(trade.closedAt).toLocaleString("tr-TR")}
                           </td>
                         </tr>
                       ))}

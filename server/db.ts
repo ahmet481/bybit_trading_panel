@@ -166,3 +166,128 @@ export async function getSignalStats(userId: number) {
     totalPnL: totalPnL.toFixed(2),
   };
 }
+
+
+/**
+ * Trade Management - İşlem Kayıt ve PnL Hesaplama
+ */
+export async function saveTrade(
+  userId: number,
+  symbol: string,
+  side: "buy" | "sell",
+  entryPrice: string,
+  exitPrice: string,
+  quantity: string,
+  positionId?: number,
+  signalId?: number
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const entry = parseFloat(entryPrice);
+  const exit = parseFloat(exitPrice);
+  const qty = parseFloat(quantity);
+
+  // PnL hesapla
+  let pnl: number;
+  if (side === "buy") {
+    pnl = (exit - entry) * qty;
+  } else {
+    pnl = (entry - exit) * qty;
+  }
+
+  const pnlPercent = ((pnl / (entry * qty)) * 100).toFixed(2);
+
+  const result = await db.insert(trades).values({
+    userId,
+    symbol,
+    side,
+    entryPrice,
+    exitPrice,
+    quantity,
+    pnl: pnl.toFixed(2),
+    pnlPercent,
+    duration: 0,
+    positionId,
+    signalId,
+    createdAt: new Date(),
+    closedAt: new Date(),
+  });
+
+  return result;
+}
+
+export async function getUserTrades(userId: number, limit: number = 50) {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db
+    .select()
+    .from(trades)
+    .where(eq(trades.userId, userId))
+    .orderBy((t) => desc(t.closedAt))
+    .limit(limit);
+}
+
+export async function getTradesBySymbol(userId: number, symbol: string, limit: number = 20) {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db
+    .select()
+    .from(trades)
+    .where(eq(trades.userId, userId) && eq(trades.symbol, symbol))
+    .orderBy((t) => desc(t.closedAt))
+    .limit(limit);
+}
+
+export async function getTradeStats(userId: number) {
+  const db = await getDb();
+  if (!db) return null;
+
+  const userTrades = await db
+    .select()
+    .from(trades)
+    .where(eq(trades.userId, userId));
+
+  if (userTrades.length === 0) {
+    return {
+      totalTrades: 0,
+      winningTrades: 0,
+      losingTrades: 0,
+      winRate: "0",
+      totalPnL: "0",
+      avgPnL: "0",
+      profitFactor: "0",
+    };
+  }
+
+  const totalTrades = userTrades.length;
+  const winningTrades = userTrades.filter((t) => parseFloat(t.pnl) > 0).length;
+  const losingTrades = userTrades.filter((t) => parseFloat(t.pnl) < 0).length;
+
+  const totalPnL = userTrades.reduce((sum, t) => sum + parseFloat(t.pnl), 0);
+  const avgPnL = totalPnL / totalTrades;
+
+  const grossProfit = userTrades
+    .filter((t) => parseFloat(t.pnl) > 0)
+    .reduce((sum, t) => sum + parseFloat(t.pnl), 0);
+
+  const grossLoss = Math.abs(
+    userTrades
+      .filter((t) => parseFloat(t.pnl) < 0)
+      .reduce((sum, t) => sum + parseFloat(t.pnl), 0)
+  );
+
+  const profitFactor = grossLoss > 0 ? (grossProfit / grossLoss).toFixed(2) : "0";
+
+  return {
+    totalTrades,
+    winningTrades,
+    losingTrades,
+    winRate: ((winningTrades / totalTrades) * 100).toFixed(2),
+    totalPnL: totalPnL.toFixed(2),
+    avgPnL: avgPnL.toFixed(2),
+    profitFactor,
+  };
+}
