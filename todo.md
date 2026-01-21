@@ -71,3 +71,10 @@
 - [ ] Pozisyon takibi ve kar/kayıp hesaplama
 - [ ] Bot'u belirli aralıklarla çalıştır (1 dakika/5 dakika)
 - [ ] İşlem geçmişini veritabanına kaydet
+
+
+## 🆕 FEATURE - Açık İşlemler Paneli & Profesyonel Grafikler
+- [ ] Açık işlemler paneli (entry, exit, PnL)
+- [ ] İşlem geçmişi tablosu
+- [ ] Profesyonel mum grafikleri (candlestick)
+- [ ] Teknik göstergeler (RSI, MACD, Bollinger Bands)

@@ -12,6 +12,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { OpenPositions } from "@/components/OpenPositions";
+import { CandlestickChart } from "@/components/CandlestickChart";
+import { TradeHistory } from "@/components/TradeHistory";
+import { ProChart } from "@/components/ProChart";
 
 const SYMBOLS = ["BTCUSDT", "ETHUSDT", "BNBUSDT", "ADAUSDT", "DOGEUSDT"];
 
@@ -254,13 +258,22 @@ export default function Dashboard() {
           </Card>
         </div>
 
-        {/* Chart Section */}
+        {/* Profesyonel Grafik */}
         {chartData?.data && chartData.data.length > 0 && (
           <div className="mb-8">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">{selectedSymbol} - 1H Grafiği</h2>
-            <TradingChart symbol={selectedSymbol} data={chartData.data} height={400} />
+            <ProChart symbol={selectedSymbol} candles={chartData.data} />
           </div>
         )}
+
+        {/* Açık İşlemler */}
+        <div className="mb-8">
+          <OpenPositions positions={[]} />
+        </div>
+
+        {/* İşlem Geçmişi */}
+        <div className="mb-8">
+          <TradeHistory trades={[]} />
+        </div>
 
 
 
