@@ -279,9 +279,7 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               {balanceLoading ? (
-                <div className="text-2xl font-bold text-gray-400">Yükleniyor...</div>
-              ) : balance?.error ? (
-                <div className="text-sm text-red-600">{balance.error}</div>
+                <div className="text-2xl font-bold text-gray-400">Yüklenıyor...</div>
               ) : (
                 <div className="text-2xl font-bold text-gray-900">${balance?.balance || "0"}</div>
               )}

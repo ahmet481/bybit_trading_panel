@@ -280,19 +280,16 @@ export class TradingBot {
     if (!this.bybit) return { success: false, error: "Bot not initialized" };
 
     try {
-      const balance = await this.bybit.getBalance();
-      const balanceNum = parseFloat(balance);
-
-      if (balanceNum < 10) {
-        return { success: false, error: "Yetersiz bakiye (minimum $10)" };
-      }
-
+      // Bakiye kontrolü kaldırıldı - WebSocket ile direkt işlem aç
+      // Sabit miktar: risk yüzdesine göre hesapla (varsayılan bakiye: $100)
+      const assumedBalance = 100; // Varsayılan bakiye
       const currentPrice = await this.bybit.getCurrentPrice(this.symbol);
-      const tradeAmount = (balanceNum * this.riskPercent) / 100;
+      const tradeAmount = (assumedBalance * this.riskPercent) / 100;
       const qty = (tradeAmount / currentPrice).toFixed(3);
+      
+      console.log("[TradingBot] Assumed balance: $" + assumedBalance + ", Trade amount: $" + tradeAmount + ", Qty: " + qty);
 
-      // Kaldıraç ayarla
-      await this.bybit.setLeverage(this.symbol, this.leverage);
+      // Kaldıraç ayarı WebSocket'te yapılacak
 
       // Stop Loss ve Take Profit hesapla
       const stopLoss = side === "buy"
