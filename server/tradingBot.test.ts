@@ -100,17 +100,19 @@ describe("Trading Bot", () => {
       expect(result.orderId).toBe("order-123");
     });
 
-    it("should execute trade with assumed balance", async () => {
+    it("should reject trade with insufficient balance", async () => {
       const bot = new TradingBot(1, "BTCUSDT", 10, 5, 2, 4);
 
       const mockBybit = {
+        getBalance: vi.fn().mockResolvedValue("5"),
         getCurrentPrice: vi.fn().mockResolvedValue(50000),
       };
 
       (bot as any).bybit = mockBybit;
       const result = await bot.executeTrade("buy", 80, "Test signal");
 
-      expect(result).toBeDefined();
+      expect(result.success).toBe(false);
+      expect(result.error).toContain("Yetersiz bakiye");
     });
   });
 });

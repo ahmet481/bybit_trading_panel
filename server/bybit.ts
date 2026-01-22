@@ -13,12 +13,7 @@ export class BybitManager {
   constructor(apiKey: string, apiSecret: string, isMainnet: boolean = true) {
     this.apiKey = apiKey;
     this.apiSecret = apiSecret;
-    // Testnet veya Mainnet URL'sini seç
-    this.baseURL = isMainnet 
-      ? "https://api.bybit.com" 
-      : "https://api-testnet.bybit.com";
-    
-    console.log(`[Bybit] Initialized with ${isMainnet ? 'MAINNET' : 'TESTNET'} - ${this.baseURL}`);
+    this.baseURL = "https://api.bybit.com";
 
     this.client = axios.create({
       baseURL: this.baseURL,
@@ -27,18 +22,15 @@ export class BybitManager {
   }
 
   /**
-   * Bybit V5 API imzası oluştur
-   * Sıra: timestamp + api_key + recv_window + query_string
+   * Bybit V5 API imzası oluştur (DOĞRU SIRA)
    */
   private generateSignature(timestamp: number, recvWindow: number, queryString: string): string {
+    // Doğru sıra: timestamp + api_key + recvWindow + queryString
     const preSign = `${timestamp}${this.apiKey}${recvWindow}${queryString}`;
-    console.log("[Bybit] Signature pre-sign:", preSign);
-    const signature = crypto
+    return crypto
       .createHmac("sha256", this.apiSecret)
       .update(preSign)
       .digest("hex");
-    console.log("[Bybit] Generated signature:", signature);
-    return signature;
   }
 
   /**
