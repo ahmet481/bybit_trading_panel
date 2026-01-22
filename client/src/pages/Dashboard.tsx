@@ -104,9 +104,9 @@ export default function Dashboard() {
         takeProfitPercent: 4,
       });
       if (result.success) {
-        toast.success("Bot başlandı!");
+        toast.success("Bot başlatıldı!");
       } else {
-        toast.error(`Hata: ${result.error}`);
+        toast.error(`Hata: ${(result as any).error || (result as any).message || 'Bilinmeyen hata'}`);
       }
     } catch (error) {
       toast.error("Bot başlatma hatası");
@@ -119,7 +119,7 @@ export default function Dashboard() {
       if (result.success) {
         toast.success("Bot durduruldu!");
       } else {
-        toast.error(`Hata: ${result.error}`);
+        toast.error(`Hata: ${(result as any).error || (result as any).message || 'Bilinmeyen hata'}`);
       }
     } catch (error) {
       toast.error("Bot durdurma hatası");

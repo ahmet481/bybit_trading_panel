@@ -51,11 +51,9 @@ function calculateEMA(values: number[], period: number): number {
 }
 
 function calculateBollingerBands(closes: number[], period: number = 20, stdDev: number = 2) {
-  const sma = closes.slice(-period).reduce((a, b) => a + b, 0) / period;
+  const sma = closes.slice(-period).reduce((a, b) => a + b) / period;
   const variance =
-    closes
-      .slice(-period)
-      .reduce((sum, val) => sum + Math.pow(val - sma, 2), 0) / period;
+    closes.slice(-period).reduce((a, b) => a + Math.pow(b - sma, 2), 0) / period;
   const std = Math.sqrt(variance);
 
   return {
@@ -77,6 +75,7 @@ export class TradingBot {
   private takeProfitPercent: number;
   private bybit: BybitManager | null = null;
   private running: boolean = false;
+  private isMainnet: boolean = false; // Varsayılan olarak testnet
 
   constructor(
     userId: number,
@@ -84,7 +83,8 @@ export class TradingBot {
     leverage: number,
     riskPercent: number,
     stopLossPercent: number,
-    takeProfitPercent: number
+    takeProfitPercent: number,
+    isMainnet: boolean = false
   ) {
     this.userId = userId;
     this.symbol = symbol;
@@ -92,6 +92,22 @@ export class TradingBot {
     this.riskPercent = riskPercent;
     this.stopLossPercent = stopLossPercent;
     this.takeProfitPercent = takeProfitPercent;
+    this.isMainnet = isMainnet;
+  }
+
+  /**
+   * Mainnet/Testnet modunu ayarla
+   */
+  setMainnetMode(isMainnet: boolean) {
+    this.isMainnet = isMainnet;
+    console.log(`[TradingBot] Switched to ${isMainnet ? 'MAINNET' : 'TESTNET'} mode`);
+  }
+
+  /**
+   * Şu anki modu döndür
+   */
+  isMainnetMode(): boolean {
+    return this.isMainnet;
   }
 
   /**
@@ -108,7 +124,8 @@ export class TradingBot {
         return false;
       }
 
-      this.bybit = new BybitManager(apiKey, apiSecret);
+      this.bybit = new BybitManager(apiKey, apiSecret, this.isMainnet);
+      console.log(`[TradingBot] Bot initialized in ${this.isMainnet ? 'MAINNET' : 'TESTNET'} mode`);
       return true;
     } catch (error) {
       console.error("[TradingBot] Initialize error:", error);
@@ -117,7 +134,7 @@ export class TradingBot {
   }
 
   /**
-   * Piyasayı analiz et ve sinyal üret (İYİLEŞTİRİLMİŞ)
+   * Piyasayı analiz et ve sinyal üret
    */
   async analyzeMarket(): Promise<{
     signal: "buy" | "sell" | "hold";
@@ -145,7 +162,7 @@ export class TradingBot {
     const doubleTop = detectedPattern === "double_top";
     const doubleBottom = detectedPattern === "double_bottom";
 
-    // Sinyal üret (İYİLEŞTİRİLMİŞ MANTIK)
+    // Sinyal üret
     let signal: "buy" | "sell" | "hold" = "hold";
     let confidence = 0;
     let reasons: string[] = [];
@@ -153,91 +170,67 @@ export class TradingBot {
 
     const currentPrice = closes[closes.length - 1];
 
-    // **1. RSI Analizi (Daha Güçlü)**
+    // **1. RSI Analizi**
     if (rsi < 30) {
       signal = "buy";
-      confidence += 40; // Artırıldı
+      confidence += 40;
       reasons.push("RSI çok düşük (aşırı satım)");
     } else if (rsi > 70) {
       signal = "sell";
-      confidence += 40; // Artırıldı
+      confidence += 40;
       reasons.push("RSI çok yüksek (aşırı alım)");
-    } else if (rsi < 40) {
-      signal = "buy";
-      confidence += 20;
-      reasons.push("RSI düşük");
-    } else if (rsi > 60) {
-      signal = "sell";
-      confidence += 20;
-      reasons.push("RSI yüksek");
     }
 
-    // **2. MACD Analizi (Daha Güçlü)**
+    // **2. MACD Analizi**
     if (macdHistogram > 0 && macdValue > macdSignal) {
-      if (signal !== "sell") {
+      if (signal === "buy") confidence += 25;
+      else if (signal === "hold") {
         signal = "buy";
-        confidence += 35; // Artırıldı
-        reasons.push("MACD pozitif kesişim");
+        confidence += 35;
       }
+      reasons.push("MACD pozitif histogram");
     } else if (macdHistogram < 0 && macdValue < macdSignal) {
-      if (signal !== "buy") {
+      if (signal === "sell") confidence += 25;
+      else if (signal === "hold") {
         signal = "sell";
-        confidence += 35; // Artırıldı
-        reasons.push("MACD negatif kesişim");
+        confidence += 35;
       }
+      reasons.push("MACD negatif histogram");
     }
 
-    // **3. Bollinger Bands Analizi (YENİ)**
+    // **3. Bollinger Bands**
     if (currentPrice < bb.lower) {
-      signal = "buy";
-      confidence += 25;
+      if (signal === "buy") confidence += 20;
       reasons.push("Fiyat alt bandın altında");
     } else if (currentPrice > bb.upper) {
-      signal = "sell";
-      confidence += 25;
+      if (signal === "sell") confidence += 20;
       reasons.push("Fiyat üst bandın üstünde");
     }
 
-    // **4. EMA Trend Analizi (YENİ)**
-    const ema20 = calculateEMA(closes, 20);
-    const ema50 = calculateEMA(closes, 50);
-
-    if (ema20 > ema50 && signal === "buy") {
-      confidence += 15;
-      reasons.push("EMA yükseliş trendi");
-    } else if (ema20 < ema50 && signal === "sell") {
-      confidence += 15;
-      reasons.push("EMA düşüş trendi");
-    }
-
-    // **5. Volatilite Kontrolü (YENİ)**
-    const volatility = (bb.upper - bb.lower) / bb.middle;
-    if (volatility < 0.01) {
-      // Çok düşük volatilite = sinyal güvenilmez
-      confidence = Math.max(0, confidence - 20);
-      reasons.push("Düşük volatilite (sinyal zayıf)");
-    }
-
-    // **6. Formasyon Analizi**
+    // **4. Formasyon Tespiti**
     if (doubleBottom && signal === "buy") {
       confidence += 30;
-      reasons.push("Çift Dip formasyonu");
-      pattern = detectedPattern;
+      pattern = "double_bottom";
+      reasons.push("Çift Dip Formasyonu");
     } else if (doubleTop && signal === "sell") {
       confidence += 30;
-      reasons.push("Çift Tepe formasyonu");
-      pattern = detectedPattern;
+      pattern = "double_top";
+      reasons.push("Çift Tepe Formasyonu");
     }
 
-    // Minimum güven eşiği (daha yüksek = daha seçici)
-    if (confidence < 50) {
-      signal = "hold";
+    // **5. Volatilite Kontrolü**
+    const volatility = Math.sqrt(
+      closes.slice(-20).reduce((sum: number, close: number) => sum + Math.pow(close - closes[closes.length - 1], 2), 0) / 20
+    );
+    if (volatility < 0.5) {
+      confidence *= 0.7; // Düşük volatilite = zayıf sinyal
+      reasons.push("Düşük volatilite (zayıf sinyal)");
     }
 
     return {
       signal,
-      confidence: Math.min(confidence, 100),
-      reason: reasons.join(" + "),
+      confidence: Math.min(100, Math.max(0, confidence)),
+      reason: reasons.join(" | "),
       rsi,
       macdHistogram,
       pattern,
@@ -255,22 +248,12 @@ export class TradingBot {
     const recentLows = lows.slice(-5);
 
     // Çift Dip
-    if (
-      recentLows[1] > recentLows[0] &&
-      recentLows[2] < recentLows[1] &&
-      recentLows[3] < recentLows[2] &&
-      recentLows[4] > recentLows[3]
-    ) {
+    if (recentLows[1] > recentLows[0] && recentLows[3] > recentLows[2] && recentLows[0] === recentLows[2]) {
       return "double_bottom";
     }
 
     // Çift Tepe
-    if (
-      recentHighs[1] < recentHighs[0] &&
-      recentHighs[2] > recentHighs[1] &&
-      recentHighs[3] > recentHighs[2] &&
-      recentHighs[4] < recentHighs[3]
-    ) {
+    if (recentHighs[1] < recentHighs[0] && recentHighs[3] < recentHighs[2] && recentHighs[0] === recentHighs[2]) {
       return "double_top";
     }
 
@@ -280,190 +263,150 @@ export class TradingBot {
   /**
    * İşlem yürüt
    */
-  async executeTrade(
-    signal: "buy" | "sell",
-    confidence: number,
-    reason: string
-  ): Promise<{ success: boolean; orderId?: string; error?: string }> {
-    try {
-      if (!this.bybit) throw new Error("Bot not initialized");
+  async executeTrade(side: "buy" | "sell", confidence: number, reason: string) {
+    if (!this.bybit) return { success: false, error: "Bot not initialized" };
 
-      // Bakiye kontrol et
-      const balance = await this.bybit.getBalance("USDT");
+    try {
+      const balance = await this.bybit.getBalance();
       const balanceNum = parseFloat(balance);
 
       if (balanceNum < 10) {
-        return { success: false, error: "Yetersiz bakiye (min 10 USDT)" };
+        return { success: false, error: "Yetersiz bakiye (minimum $10)" };
       }
 
-      // Güncel fiyatı al
       const currentPrice = await this.bybit.getCurrentPrice(this.symbol);
+      const tradeAmount = (balanceNum * this.riskPercent) / 100;
+      const qty = (tradeAmount / currentPrice).toFixed(3);
 
       // Kaldıraç ayarla
       await this.bybit.setLeverage(this.symbol, this.leverage);
 
-      // İşlem miktarını hesapla (risk yönetimi)
-      const riskAmount = (balanceNum * this.riskPercent) / 100;
-      const qty = ((riskAmount * this.leverage) / currentPrice).toFixed(3);
-
       // Stop Loss ve Take Profit hesapla
-      const stopLossPrice = (currentPrice * (1 - this.stopLossPercent / 100)).toFixed(2);
-      const takeProfitPrice = (currentPrice * (1 + this.takeProfitPercent / 100)).toFixed(2);
+      const stopLoss = side === "buy"
+        ? (currentPrice * (1 - this.stopLossPercent / 100)).toFixed(2)
+        : (currentPrice * (1 + this.stopLossPercent / 100)).toFixed(2);
+
+      const takeProfit = side === "buy"
+        ? (currentPrice * (1 + this.takeProfitPercent / 100)).toFixed(2)
+        : (currentPrice * (1 - this.takeProfitPercent / 100)).toFixed(2);
 
       console.log("[TradingBot] Executing trade:", {
-        side: signal === "buy" ? "Buy" : "Sell",
+        side: side === "buy" ? "Buy" : "Sell",
         qty,
         currentPrice,
-        stopLoss: stopLossPrice,
-        takeProfit: takeProfitPrice,
+        stopLoss,
+        takeProfit,
         confidence,
       });
 
-      // İşlem aç
       const result = await this.bybit.placeOrder(
         this.symbol,
-        signal === "buy" ? "Buy" : "Sell",
+        side === "buy" ? "Buy" : "Sell",
         qty,
         "Market",
         undefined,
-        stopLossPrice,
-        takeProfitPrice
+        stopLoss,
+        takeProfit
       );
 
       if (result.success) {
-        console.log("[TradingBot] Trade opened successfully:", result.orderId);
-        return { success: true, orderId: result.orderId };
-      } else {
-        return { success: false, error: result.error };
+        console.log(`[TradingBot] Trade opened successfully: ${result.orderId}`);
       }
+
+      return result;
     } catch (error: any) {
-      console.error("[TradingBot] Trade execution error:", error);
+      console.error("[TradingBot] Trade execution error:", error.message);
       return { success: false, error: error.message };
     }
   }
 
   /**
-   * Açık pozisyonları kontrol et
+   * Bot döngüsünü başlat
    */
-  async checkOpenPositions(): Promise<any[]> {
-    try {
-      if (!this.bybit) return [];
-      const positions = await this.bybit.getPositions(this.symbol);
-      return positions.filter((p: any) => parseFloat(p.size) > 0);
-    } catch (error) {
-      console.error("[TradingBot] Check positions error:", error);
-      return [];
-    }
-  }
-
-  /**
-   * Bot döngüsünü çalıştır
-   */
-  async run() {
+  async start() {
+    if (this.running) return;
     this.running = true;
-    console.log(`[TradingBot] Bot started for ${this.symbol}`);
+    console.log(`[TradingBot] Bot started in ${this.isMainnet ? 'MAINNET' : 'TESTNET'} mode`);
 
     while (this.running) {
       try {
-        // Açık pozisyon kontrol et
-        const openPositions = await this.checkOpenPositions();
+        const analysis = await this.analyzeMarket();
 
-        if (openPositions.length === 0) {
-          // Piyasayı analiz et
-          const analysis = await this.analyzeMarket();
-          console.log("[TradingBot] Analysis:", analysis);
-
-          // Sinyal varsa işlem aç (confidence eşiği yükseltildi)
-          if (analysis.signal !== "hold" && analysis.confidence >= 50) {
-            const result = await this.executeTrade(
-              analysis.signal,
-              analysis.confidence,
-              analysis.reason
-            );
-            console.log("[TradingBot] Trade result:", result);
-          }
-        } else {
-          console.log("[TradingBot] Open position exists, skipping...");
+        if (analysis.confidence >= 50 && analysis.signal !== "hold") {
+          await this.executeTrade(analysis.signal, analysis.confidence, analysis.reason);
         }
 
-        // 20 saniye bekle (daha sık analiz)
+        // 20 saniye bekle
         await new Promise((resolve) => setTimeout(resolve, 20000));
       } catch (error) {
-        console.error("[TradingBot] Error in loop:", error);
-        await new Promise((resolve) => setTimeout(resolve, 10000));
+        console.error("[TradingBot] Error in bot loop:", error);
+        await new Promise((resolve) => setTimeout(resolve, 5000));
       }
     }
   }
 
   /**
-   * Bot'u durdur
+   * Bot döngüsünü durdur
    */
   stop() {
     this.running = false;
-    console.log(`[TradingBot] Bot stopped for ${this.symbol}`);
+    console.log("[TradingBot] Bot stopped");
+  }
+
+  /**
+   * Bot çalışıyor mu?
+   */
+  isRunning(): boolean {
+    return this.running;
   }
 }
 
-// Bot instance'larını sakla
-const activeBots: Map<number, TradingBot> = new Map();
+// Global bot instance
+let botInstance: TradingBot | null = null;
 
-/**
- * Kullanıcı için bot başlat
- */
-export async function startBot(
-  userId: number,
-  symbol: string = "BTCUSDT",
-  leverage: number = 10,
-  riskPercent: number = 5,
-  stopLossPercent: number = 2,
-  takeProfitPercent: number = 4
-): Promise<{ success: boolean; error?: string }> {
-  if (activeBots.has(userId)) {
-    return { success: false, error: "Bot zaten çalışıyor" };
+export function startBot(userId: number, isMainnet: boolean = false): { success: boolean; message: string; error?: string } {
+  if (botInstance?.isRunning()) {
+    return { success: false, message: "Bot zaten çalışıyor" };
   }
 
-  const bot = new TradingBot(
-    userId,
-    symbol,
-    leverage,
-    riskPercent,
-    stopLossPercent,
-    takeProfitPercent
-  );
+  botInstance = new TradingBot(userId, "BTCUSDT", 10, 5, 2, 4, isMainnet);
 
-  const initialized = await bot.initialize();
-  if (!initialized) {
-    return { success: false, error: "Bot başlatılamadı. API anahtarlarını kontrol edin." };
-  }
-
-  activeBots.set(userId, bot);
-
-  // Bot'u arka planda çalıştır
-  bot.run().catch((err) => {
-    console.error("[TradingBot] Fatal error:", err);
-    activeBots.delete(userId);
+  botInstance.initialize().then((success) => {
+    if (success) {
+      botInstance?.start();
+    } else {
+      console.error("[TradingBot] Failed to initialize bot");
+    }
   });
 
-  return { success: true };
+  return { success: true, message: `Bot başlatıldı (${isMainnet ? 'MAINNET' : 'TESTNET'})` };
 }
 
-/**
- * Kullanıcı için bot durdur
- */
-export function stopBot(userId: number): { success: boolean; error?: string } {
-  const bot = activeBots.get(userId);
-  if (!bot) {
-    return { success: false, error: "Bot çalışmıyor" };
+export function stopBot(userId: number): { success: boolean; message: string } {
+  if (!botInstance?.isRunning()) {
+    return { success: false, message: "Bot çalışmıyor" };
   }
 
-  bot.stop();
-  activeBots.delete(userId);
-  return { success: true };
+  botInstance.stop();
+  return { success: true, message: "Bot durduruldu" };
 }
 
-/**
- * Bot durumunu al
- */
-export function getBotStatus(userId: number): { running: boolean } {
-  return { running: activeBots.has(userId) };
+export function getBotStatus(userId: number): {
+  running: boolean;
+  mode: "MAINNET" | "TESTNET";
+  symbol: string;
+} {
+  return {
+    running: botInstance?.isRunning() ?? false,
+    mode: botInstance?.isMainnetMode() ? "MAINNET" : "TESTNET",
+    symbol: "BTCUSDT",
+  };
+}
+
+export function setTradingMode(userId: number, isMainnet: boolean) {
+  if (botInstance) {
+    botInstance.setMainnetMode(isMainnet);
+    return { success: true, message: `${isMainnet ? 'MAINNET' : 'TESTNET'} moduna geçildi` };
+  }
+  return { success: false, message: "Bot instance bulunamadı" };
 }

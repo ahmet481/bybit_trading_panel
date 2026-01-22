@@ -13,7 +13,12 @@ export class BybitManager {
   constructor(apiKey: string, apiSecret: string, isMainnet: boolean = true) {
     this.apiKey = apiKey;
     this.apiSecret = apiSecret;
-    this.baseURL = "https://api.bybit.com";
+    // Testnet veya Mainnet URL'sini seç
+    this.baseURL = isMainnet 
+      ? "https://api.bybit.com" 
+      : "https://api-testnet.bybit.com";
+    
+    console.log(`[Bybit] Initialized with ${isMainnet ? 'MAINNET' : 'TESTNET'} - ${this.baseURL}`);
 
     this.client = axios.create({
       baseURL: this.baseURL,

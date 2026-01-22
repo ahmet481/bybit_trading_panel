@@ -96,17 +96,14 @@ export const appRouter = router({
         riskPercent: z.number().default(5),
         stopLossPercent: z.number().default(2),
         takeProfitPercent: z.number().default(4),
+        isMainnet: z.boolean().default(false),
       }))
       .mutation(async ({ ctx, input }) => {
         try {
           const { startBot } = await import("./tradingBot");
-          const result = await startBot(
+          const result = startBot(
             ctx.user.id,
-            input.symbol,
-            input.leverage,
-            input.riskPercent,
-            input.stopLossPercent,
-            input.takeProfitPercent
+            input.isMainnet ?? false
           );
           return result;
         } catch (error: any) {
