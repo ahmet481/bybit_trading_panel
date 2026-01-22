@@ -1,4 +1,5 @@
 import { BybitManager } from "./bybit";
+import { BybitWebSocketManager } from "./bybitWebSocket";
 
 /**
  * Teknik Analiz Fonksiyonları
@@ -74,6 +75,7 @@ export class TradingBot {
   private stopLossPercent: number;
   private takeProfitPercent: number;
   private bybit: BybitManager | null = null;
+  private bybitWS: BybitWebSocketManager | null = null;
   private running: boolean = false;
   private isMainnet: boolean = false; // Varsayılan olarak testnet
 
@@ -124,8 +126,19 @@ export class TradingBot {
         return false;
       }
 
+      // REST API manager
       this.bybit = new BybitManager(apiKey, apiSecret, this.isMainnet);
-      console.log(`[TradingBot] Bot initialized in ${this.isMainnet ? 'MAINNET' : 'TESTNET'} mode`);
+      
+      // WebSocket manager (işlem için)
+      this.bybitWS = new BybitWebSocketManager(apiKey, apiSecret, this.isMainnet);
+      const wsConnected = await this.bybitWS.connect();
+      
+      if (wsConnected) {
+        console.log(`[TradingBot] Bot initialized with WebSocket in ${this.isMainnet ? 'MAINNET' : 'TESTNET'} mode`);
+      } else {
+        console.warn(`[TradingBot] WebSocket connection failed, using REST API fallback`);
+      }
+      
       return true;
     } catch (error) {
       console.error("[TradingBot] Initialize error:", error);
@@ -299,15 +312,28 @@ export class TradingBot {
         confidence,
       });
 
-      const result = await this.bybit.placeOrder(
-        this.symbol,
-        side === "buy" ? "Buy" : "Sell",
-        qty,
-        "Market",
-        undefined,
-        stopLoss,
-        takeProfit
-      );
+      // WebSocket ile işlem aç (REST API fallback ile)
+      let result;
+      if (this.bybitWS?.isConnected()) {
+        result = await this.bybitWS.placeOrder(
+          this.symbol,
+          side === "buy" ? "Buy" : "Sell",
+          qty,
+          stopLoss,
+          takeProfit
+        );
+      } else {
+        // REST API fallback
+        result = await this.bybit.placeOrder(
+          this.symbol,
+          side === "buy" ? "Buy" : "Sell",
+          qty,
+          "Market",
+          undefined,
+          stopLoss,
+          takeProfit
+        );
+      }
 
       if (result.success) {
         console.log(`[TradingBot] Trade opened successfully: ${result.orderId}`);

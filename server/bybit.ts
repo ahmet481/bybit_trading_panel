@@ -27,15 +27,18 @@ export class BybitManager {
   }
 
   /**
-   * Bybit V5 API imzası oluştur (DOĞRU SIRA)
+   * Bybit V5 API imzası oluştur
+   * Sıra: timestamp + api_key + recv_window + query_string
    */
   private generateSignature(timestamp: number, recvWindow: number, queryString: string): string {
-    // Doğru sıra: timestamp + api_key + recvWindow + queryString
     const preSign = `${timestamp}${this.apiKey}${recvWindow}${queryString}`;
-    return crypto
+    console.log("[Bybit] Signature pre-sign:", preSign);
+    const signature = crypto
       .createHmac("sha256", this.apiSecret)
       .update(preSign)
       .digest("hex");
+    console.log("[Bybit] Generated signature:", signature);
+    return signature;
   }
 
   /**
