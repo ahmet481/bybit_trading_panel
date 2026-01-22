@@ -71,7 +71,7 @@ export class SignalGenerator {
         try {
           // Bybit'ten K-Line verilerini çek (API key olmadan, sadece market data)
           const bybit = new BybitManager("", "");
-          const klineData = await bybit.getKlineData(symbol, interval, 100);
+          const klineData = await bybit.getKlines(symbol, interval, 100);
 
           if (!klineData || klineData.length === 0) continue;
 

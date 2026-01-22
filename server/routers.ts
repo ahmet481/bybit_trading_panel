@@ -67,7 +67,7 @@ export const appRouter = router({
       .query(async ({ input }) => {
         try {
           const bybit = new BybitManager("dummy", "dummy");
-          const klineData = await bybit.getKlineData(input.symbol, input.interval, 100);
+          const klineData = await bybit.getKlines(input.symbol, input.interval, 100);
           
           return { data: klineData, error: null };
         } catch (error: any) {
@@ -142,7 +142,7 @@ export const appRouter = router({
       .query(async ({ input }) => {
         try {
           const bybit = new BybitManager("dummy", "dummy");
-          const positions = await bybit.getPositions(input.symbol);
+          const positions = await bybit.getOpenPositions();
           return { positions, error: null };
         } catch (error: any) {
           console.error("[Trading] Get positions error:", error);

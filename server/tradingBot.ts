@@ -348,7 +348,7 @@ export class TradingBot {
   async checkOpenPositions(): Promise<any[]> {
     try {
       if (!this.bybit) return [];
-      const positions = await this.bybit.getPositions(this.symbol);
+      const positions = await this.bybit.getOpenPositions();
       return positions.filter((p: any) => parseFloat(p.size) > 0);
     } catch (error) {
       console.error("[TradingBot] Check positions error:", error);
